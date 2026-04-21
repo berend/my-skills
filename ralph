@@ -1,0 +1,123 @@
+#!/bin/bash
+set -euo pipefail
+
+STREAM_CLAUDE=false
+MAX_ISSUES=0
+ISSUES_DIR="./.plans/ISSUES"
+COMPLETED_COUNT=0
+TOTAL_INPUT_TOKENS=0
+TOTAL_OUTPUT_TOKENS=0
+TOTAL_SECONDS=0
+
+format_duration() {
+    local seconds=$1
+    if [[ $seconds -ge 3600 ]]; then
+        printf "%dh %dm %ds" $((seconds/3600)) $((seconds%3600/60)) $((seconds%60))
+    elif [[ $seconds -ge 60 ]]; then
+        printf "%dm %ds" $((seconds/60)) $((seconds%60))
+    else
+        printf "%ds" $seconds
+    fi
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --stream-claude)
+            STREAM_CLAUDE=true
+            shift
+            ;;
+        *)
+            MAX_ISSUES="$1"
+            shift
+            ;;
+    esac
+done
+
+if [[ ! -d "$ISSUES_DIR" ]]; then
+    echo "Error: Issues directory $ISSUES_DIR does not exist"
+    exit 1
+fi
+
+while true; do
+    ISSUE_FILE=$(find "$ISSUES_DIR" -maxdepth 1 -type f -name "*.md" 2>/dev/null | sort | head -n 1)
+
+    if [[ -z "$ISSUE_FILE" ]]; then
+        echo "All issues completed!"
+        break
+    fi
+
+    ISSUE_NAME=$(basename "$ISSUE_FILE")
+    echo "=== Working on: $ISSUE_NAME ==="
+
+    PROMPT="You are working through a queue of implementation issues.
+
+Your current task is defined in: $ISSUE_FILE
+
+Instructions:
+1. Read the issue file carefully
+2. Implement the required changes
+3. Make sure linters and tests pass
+4. Create ONE git commit with a meaningful message describing what you did
+5. Delete the issue file after successful commit: rm $ISSUE_FILE
+6. Exit with code 0 when done
+
+After completing this issue, check if there are more issues in $ISSUES_DIR.
+If NO more issue files remain, respond with exactly: <promise>COMPLETE</promise>
+Otherwise, just exit normally (the orchestrator will start a new session for the next issue)."
+
+    TMPFILE=$(mktemp)
+    trap "rm -f $TMPFILE" EXIT
+    START_TIME=$(date +%s)
+
+    if [[ "$STREAM_CLAUDE" == true ]]; then
+        claude \
+            --verbose \
+            --print \
+            --output-format stream-json \
+            --permission-mode bypassPermissions \
+            -p "$PROMPT" \
+            | grep --line-buffered '^{' \
+            | tee "$TMPFILE" \
+            | jq --unbuffered -rj 'select(.type == "assistant" and .message.content[]?.text?) | .message.content[] | select(.type == "text") | .text // empty'
+
+        OUTPUT=$(cat "$TMPFILE")
+    else
+        OUTPUT=$(claude -p "$PROMPT" --output-format json 2>&1) || true
+        echo "$OUTPUT" > "$TMPFILE"
+        echo "$OUTPUT" | jq -r '.result // .message // .' 2>/dev/null || echo "$OUTPUT"
+    fi
+
+    END_TIME=$(date +%s)
+    ISSUE_SECONDS=$((END_TIME - START_TIME))
+    TOTAL_SECONDS=$((TOTAL_SECONDS + ISSUE_SECONDS))
+    ISSUE_DURATION=$(format_duration $ISSUE_SECONDS)
+
+    INPUT_TOKENS=$(cat "$TMPFILE" | grep '^{' | jq -s '[.[] | select(.type == "result") | .usage.input_tokens // 0] | add // 0')
+    OUTPUT_TOKENS=$(cat "$TMPFILE" | grep '^{' | jq -s '[.[] | select(.type == "result") | .usage.output_tokens // 0] | add // 0')
+    TOTAL_INPUT_TOKENS=$((TOTAL_INPUT_TOKENS + INPUT_TOKENS))
+    TOTAL_OUTPUT_TOKENS=$((TOTAL_OUTPUT_TOKENS + OUTPUT_TOKENS))
+
+    if cat "$TMPFILE" | grep -q "<promise>COMPLETE</promise>"; then
+        echo ""
+        echo "All issues completed!"
+        echo "=== Issue #$((COMPLETED_COUNT + 1)): tokens in=$INPUT_TOKENS out=$OUTPUT_TOKENS, time=$ISSUE_DURATION ==="
+        COMPLETED_COUNT=$((COMPLETED_COUNT + 1))
+        break
+    fi
+
+    COMPLETED_COUNT=$((COMPLETED_COUNT + 1))
+    echo ""
+    echo "=== Completed issue #$COMPLETED_COUNT: $ISSUE_NAME ==="
+    echo "=== Tokens in=$INPUT_TOKENS out=$OUTPUT_TOKENS, time=$ISSUE_DURATION ==="
+
+    if [[ "$MAX_ISSUES" -gt 0 && "$COMPLETED_COUNT" -ge "$MAX_ISSUES" ]]; then
+        echo "Reached maximum issue limit ($MAX_ISSUES). Stopping."
+        break
+    fi
+done
+
+echo ""
+echo "=== Ralph completed ==="
+echo "Total issues tackled: $COMPLETED_COUNT"
+echo "Total tokens: input=$TOTAL_INPUT_TOKENS, output=$TOTAL_OUTPUT_TOKENS"
+echo "Total time: $(format_duration $TOTAL_SECONDS)". 
