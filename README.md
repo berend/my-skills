@@ -4,7 +4,7 @@ since I wanted to manage my agentioc coding skills in git to install them via sk
 
 
 ### Inspiration:
-All this in copied and adjusted from https://github.com/mattpocock/skills
+All this was copied from https://github.com/mattpocock/skills and then adjusted
 
 ### My variant
 
@@ -18,6 +18,7 @@ Install skills via
 npx skills@latest add berend/my-skills/grill-me
 npx skills@latest add berend/my-skills/write-a-prd
 npx skills@latest add berend/my-skills/prd-to-issues
+npx skills@latest add berend/my-skills/grill-me-context
 ```
 
 and copy the `ralph` script into your `~/bin` (or something that is in your path)
@@ -39,3 +40,7 @@ Here is a normal workflow:
 After a run, you are still left with the PRD file, all completed ISSUES are deleted once they are completed. 
 
 every issue should be in one git commit.
+
+# Note
+
+claude is somehow deprecated since Anthropic remove `-p` from subscription plans. I switched to OpenAIs chatGPT models for now. The `ralph-claude` is there for reference.

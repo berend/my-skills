@@ -61,24 +61,22 @@ Do NOT delete the issue file — the orchestrator handles cleanup."
     trap "rm -f $TMPFILE" EXIT
     START_TIME=$(date +%s)
 
-    codex \
-        -a never \
-        exec \
-        --sandbox workspace-write \
-        --color never \
-        --json \
-        "$PROMPT" \
+    claude \
+        --verbose \
+        --print \
+        --output-format stream-json \
+        -p "$PROMPT" \
         | grep --line-buffered '^{' \
         | tee "$TMPFILE" \
-        | jq --unbuffered -rj 'select(.type == "item.completed" and .item.type == "agent_message" and .item.text?) | .item.text // empty'
+        | jq --unbuffered -rj 'select(.type == "assistant" and .message.content[]?.text?) | .message.content[] | select(.type == "text") | .text // empty'
 
     END_TIME=$(date +%s)
     ISSUE_SECONDS=$((END_TIME - START_TIME))
     TOTAL_SECONDS=$((TOTAL_SECONDS + ISSUE_SECONDS))
     ISSUE_DURATION=$(format_duration $ISSUE_SECONDS)
 
-    INPUT_TOKENS=$(jq -s '[.[] | select(.type == "turn.completed") | .usage.input_tokens // 0] | add // 0' "$TMPFILE")
-    OUTPUT_TOKENS=$(jq -s '[.[] | select(.type == "turn.completed") | .usage.output_tokens // 0] | add // 0' "$TMPFILE")
+    INPUT_TOKENS=$(cat "$TMPFILE" | grep '^{' | jq -s '[.[] | select(.type == "result") | .usage.input_tokens // 0] | add // 0')
+    OUTPUT_TOKENS=$(cat "$TMPFILE" | grep '^{' | jq -s '[.[] | select(.type == "result") | .usage.output_tokens // 0] | add // 0')
     TOTAL_INPUT_TOKENS=$((TOTAL_INPUT_TOKENS + INPUT_TOKENS))
     TOTAL_OUTPUT_TOKENS=$((TOTAL_OUTPUT_TOKENS + OUTPUT_TOKENS))
 
