@@ -1,0 +1,172 @@
+#!/bin/bash
+set -euo pipefail
+
+since_days=7
+all_projects=false
+
+usage() {
+    echo "Usage: $0 [--since-days DAYS] [--all-projects]"
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --since-days)
+            if [[ $# -lt 2 || ! "$2" =~ ^[0-9]+$ ]]; then
+                echo "Error: --since-days requires an integer" >&2
+                exit 1
+            fi
+            since_days="$2"
+            shift 2
+            ;;
+        --all-projects)
+            all_projects=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: unknown argument: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+since="$(date -u -v-"$since_days"d +%Y-%m-%dT%H:%M:%SZ)"
+until="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+since_date="$(date -u -v-"$since_days"d +%Y-%m-%d)"
+until_date="$(date -u +%Y-%m-%d)"
+total=0
+ai=0
+projects_with_commits=0
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+
+process_project() {
+    local project_ref="$1"
+    local page=1
+    local project_total=0
+    local commits count sha message model agent
+
+    while true; do
+        commits="$(
+            glab api "projects/$project_ref/repository/commits?since=$since&until=$until&per_page=100&page=$page"
+        )"
+
+        count="$(printf '%s' "$commits" | jq 'length')"
+
+        if [[ "$count" -eq 0 ]]; then
+            break
+        fi
+
+        project_total=$((project_total + count))
+
+        while read -r sha; do
+            [[ -z "$sha" ]] && continue
+            total=$((total + 1))
+
+            message="$(
+                glab api "projects/$project_ref/repository/commits/$sha" \
+                    | jq -r '.message'
+            )"
+
+            if printf '%s\n' "$message" | grep -q '^AI-Assisted: true$'; then
+                ai=$((ai + 1))
+
+                model="$(
+                    printf '%s\n' "$message" \
+                        | awk -F': ' '/^AI-Model: / { print $2; found=1; exit } END { if (!found) print "<unknown>" }'
+                )"
+
+                agent="$(
+                    printf '%s\n' "$message" \
+                        | awk -F': ' '/^AI-Agent: / { print $2; found=1; exit } END { if (!found) print "<unknown>" }'
+                )"
+
+                printf 'model\t%s\nagent\t%s\n' "$model" "$agent" >> "$tmp"
+            fi
+        done <<EOF
+$(printf '%s' "$commits" | jq -r '.[].id')
+EOF
+
+        page=$((page + 1))
+    done
+
+    if [[ "$project_total" -gt 0 ]]; then
+        projects_with_commits=$((projects_with_commits + 1))
+    fi
+}
+
+if [[ "$all_projects" == true ]]; then
+    project_page=1
+
+    while true; do
+        projects="$(
+            glab api "projects?membership=true&archived=false&per_page=100&page=$project_page"
+        )"
+
+        project_count="$(printf '%s' "$projects" | jq 'length')"
+
+        if [[ "$project_count" -eq 0 ]]; then
+            break
+        fi
+
+        while IFS=$'\t' read -r project_id _project_path; do
+            [[ -z "$project_id" ]] && continue
+            process_project "$project_id"
+        done <<EOF
+$(printf '%s' "$projects" | jq -r '.[] | [.id, .path_with_namespace] | @tsv')
+EOF
+
+        project_page=$((project_page + 1))
+    done
+else
+    process_project ":fullpath"
+fi
+
+awk -v ai="$ai" -v total="$total" -v projects_with_commits="$projects_with_commits" -v since_date="$since_date" -v until_date="$until_date" '
+BEGIN {
+  print "Date range: " since_date " to " until_date
+  print "Projects with commits: " projects_with_commits
+  print "Total commits: " total
+  print "AI-assisted commits: " ai
+
+  if (total == 0) {
+    print "AI-assisted share: n/a"
+  } else {
+    printf "AI-assisted share: %.1f%%\n", ai * 100 / total
+  }
+  print ""
+}
+
+$1 == "model" {
+  model[$2]++
+}
+
+$1 == "agent" {
+  agent[$2]++
+}
+
+END {
+  print "AI-Model:"
+  if (ai == 0) {
+    print "  n/a"
+  } else {
+    for (m in model) {
+      printf "  %s: %.1f%%\n", m, model[m] * 100 / ai
+    }
+  }
+
+  print ""
+  print "AI-Agent:"
+  if (ai == 0) {
+    print "  n/a"
+  } else {
+    for (a in agent) {
+      printf "  %s: %.1f%%\n", a, agent[a] * 100 / ai
+    }
+  }
+}
+' "$tmp"

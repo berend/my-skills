@@ -54,10 +54,21 @@ Use `glab-ai-overview` inside a GitLab project to summarize how many recent comm
 ./glab-ai-overview --since-days 14
 ```
 
+To scan all non-archived GitLab projects where your `glab` user is a member:
+
+```sh
+./glab-ai-overview --all-projects --since-days 14
+```
+
+Note: For --all-projects to work, you also need to be in a git repo, because the server is determined by the origin from the current repo.
+
+
+
 Example output:
 
 ```text
 Date range: 2026-05-15 to 2026-05-29
+Projects with commits: 12
 Total commits: 42
 AI-assisted commits: 31
 AI-assisted share: 73.8%
@@ -72,4 +83,4 @@ AI-Agent:
   <unknown>: 10.0%
 ```
 
-Without `--since-days`, the script defaults to the last 7 days. It uses `glab api`, so authentication is handled by the installed `glab` CLI.
+Without `--since-days`, the script defaults to the last 7 days. Without `--all-projects`, it only scans the current GitLab project. It uses `glab api`, so authentication is handled by the installed `glab` CLI.
