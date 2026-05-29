@@ -52,7 +52,7 @@ Instructions:
 1. Read the issue file carefully
 2. Implement the required changes
 3. Make sure linters and tests pass
-4. Create ONE git commit with a meaningful message describing what you did
+4. Create ONE git commit with a meaningful message describing what you did. Add AI commit trailers using git commit --trailer when available. Always include --trailer \"AI-Assisted=true\". Include --trailer \"AI-Agent=<agent>\" only if the harness explicitly provides the agent identity. Include --trailer \"AI-Model=<model>\" only if the harness explicitly provides the model identity. Do not guess the agent or model values. If --trailer is unavailable, place the same trailer lines manually at the very end of the commit message.
 5. Exit with code 0 when done
 
 Do NOT delete the issue file — the orchestrator handles cleanup."

@@ -19,6 +19,7 @@ npx skills@latest add berend/my-skills/grill-me
 npx skills@latest add berend/my-skills/write-a-prd
 npx skills@latest add berend/my-skills/prd-to-issues
 npx skills@latest add berend/my-skills/grill-me-context
+npx skills@latest add berend/my-skills/aicommit
 ```
 
 and copy the `ralph` script into your `~/bin` (or something that is in your path)
