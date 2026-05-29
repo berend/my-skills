@@ -45,3 +45,31 @@ every issue should be in one git commit.
 # Note
 
 claude is somehow deprecated since Anthropic remove `-p` from subscription plans. I switched to OpenAIs chatGPT models for now. The `ralph-claude` is there for reference.
+
+# AI commit overview
+
+Use `glab-ai-overview` inside a GitLab project to summarize how many recent commits are marked with `AI-Assisted: true`.
+
+```sh
+./glab-ai-overview --since-days 14
+```
+
+Example output:
+
+```text
+Date range: 2026-05-15 to 2026-05-29
+Total commits: 42
+AI-assisted commits: 31
+AI-assisted share: 73.8%
+
+AI-Model:
+  openai/gpt-5.5: 55.0%
+  openai/gpt-5.4: 45.0%
+
+AI-Agent:
+  opencode: 80.0%
+  codex: 10.0%
+  <unknown>: 10.0%
+```
+
+Without `--since-days`, the script defaults to the last 7 days. It uses `glab api`, so authentication is handled by the installed `glab` CLI.
