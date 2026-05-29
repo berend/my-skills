@@ -52,7 +52,7 @@ Instructions:
 1. Read the issue file carefully
 2. Implement the required changes
 3. Make sure linters and tests pass
-4. Create ONE git commit with a meaningful message describing what you did
+4. Create ONE git commit with a meaningful message describing what you did, use a git trailer like so: git commit --trailer \"AI-Assisted-By: <model>\", where you replace model with the current model with version and reasoning level (e.g. chatGpt 5.5.medium))
 5. Exit with code 0 when done
 
 Do NOT delete the issue file — the orchestrator handles cleanup."
