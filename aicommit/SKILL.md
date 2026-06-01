@@ -31,39 +31,48 @@ Always include:
 AI-Assisted: true
 ```
 
-Include `AI-Agent` only when the coding harness explicitly provides the agent identity. Do not guess.
+Also include `AI-Agent` and `AI-Model` when they can be resolved by the Harness Identity Resolution rules.
 
-```text
-AI-Agent: opencode
-```
-
-Include `AI-Model` only when the coding harness explicitly provides the model identity. Do not guess. Prefer canonical provider/model IDs over marketing names.
-
-```text
-AI-Model: openai/gpt-5.5
-```
-
-If the agent or model identity is not available from the harness, omit that trailer rather than inventing a value.
-
-Prefer this form when committing:
+Prefer this form when all values are available:
 
 ```sh
-git commit -m "Add skill for AI-assisted commits" \
+git commit -m "Commit message" \
   --trailer "AI-Assisted=true" \
-  --trailer "AI-Agent=opencode" \
-  --trailer "AI-Model=openai/gpt-5.5"
+  --trailer "AI-Agent=<resolved-agent>" \
+  --trailer "AI-Model=<resolved-model>"
 ```
 
-Omit `AI-Agent` or `AI-Model` from the command if the harness does not explicitly provide those values.
+Omit only the unresolved trailer if either `AI-Agent` or `AI-Model` cannot be resolved.
+
+## Harness Identity Resolution
+
+Before committing, derive trailer values from explicit coding harness context.
+
+Use `AI-Agent` when the harness explicitly names the coding agent or product identity. Normalize to a stable lowercase identifier when the identity is unambiguous.
+
+Examples:
+
+- "You are Codex" -> `AI-Agent: codex`
+- "You are opencode" -> `AI-Agent: opencode`
+
+Use `AI-Model` when the harness explicitly names the model identity. Prefer canonical provider/model IDs when the provider is explicit or obvious from the harness.
+
+Examples:
+
+- "based on GPT-5" in an OpenAI/Codex harness -> `AI-Model: openai/gpt-5`
+- "openai/gpt-5.5" -> `AI-Model: openai/gpt-5.5`
+- "claude-sonnet-4" in an Anthropic harness -> `AI-Model: anthropic/claude-sonnet-4`
+
+If either value is not explicitly available from the harness context, omit only that trailer. Do not infer values from general knowledge, marketing names, or user preference unless the user explicitly provides the trailer value for this commit.
 
 ## Commit Message Example
 
 ```text
-Add skill for AI-assisted commits
+Commit message
 
 AI-Assisted: true
-AI-Agent: opencode
-AI-Model: openai/gpt-5.5
+AI-Agent: <resolved-agent>
+AI-Model: <resolved-model>
 ```
 
 ## Rules
