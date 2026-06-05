@@ -85,3 +85,10 @@ AI-Agent:
 ```
 
 Without `--since-days`, the script defaults to the last 7 days. Without `--all-projects`, it only scans the current GitLab project. It uses `glab api`, so authentication is handled by the installed `glab` CLI.
+
+# Git helper scripts
+
+Copy `gito` and `gitgm` into your `~/bin` or another directory on your `PATH`.
+
+- `gito`: scans direct child folders for git repositories that are not on `main` or `master`, then prints their branch and staged, unstaged, and untracked file counts.
+- `gitgm`: scans git repositories below the current folder, skips dirty repositories, and for clean repositories on another branch checks out `main` or `master` and pulls with `--ff-only`.

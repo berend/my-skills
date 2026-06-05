@@ -1,0 +1,50 @@
+#!/usr/bin/env sh
+
+set -eu
+
+root_dir=${1:-$(pwd)}
+
+white='\033[37m'
+grey='\033[90m'
+green='\033[32m'
+orange='\033[38;5;208m'
+red='\033[31m'
+reset='\033[0m'
+
+for dir in "$root_dir"/*; do
+    [ -d "$dir" ] || continue
+    [ -d "$dir/.git" ] || continue
+
+    branch=$(git -C "$dir" branch --show-current)
+    if [ -z "$branch" ]; then
+        branch="detached@$(git -C "$dir" rev-parse --short HEAD)"
+    fi
+
+    case "$branch" in
+        main|master)
+            continue
+            ;;
+    esac
+
+    counts=$(
+        git -C "$dir" status --porcelain=v1 -uall |
+            awk '
+                /^\?\?/ { untracked++; next }
+                {
+                    staged += (substr($0, 1, 1) != " ")
+                    unstaged += (substr($0, 2, 1) != " ")
+                }
+                END { printf "%d %d %d", staged + 0, unstaged + 0, untracked + 0 }
+            '
+    )
+
+    set -- $counts
+    folder=$(basename "$dir")
+
+    printf '%b%s%b %b[%s]%b %b%s staged%b, %b%s unstaged%b, %b%s untracked%b\n' \
+        "$white" "$folder" "$reset" \
+        "$grey" "$branch" "$reset" \
+        "$green" "$1" "$reset" \
+        "$orange" "$2" "$reset" \
+        "$red" "$3" "$reset"
+done

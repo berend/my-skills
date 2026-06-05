@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="${1:-.}"
+
+if [[ ! -d "$root" ]]; then
+  echo "error: not a directory: $root" >&2
+  exit 1
+fi
+
+find "$root" -type d -name .git -prune | while IFS= read -r git_dir; do
+  repo="${git_dir%/.git}"
+
+  if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    continue
+  fi
+
+  branch="$(git -C "$repo" symbolic-ref --quiet --short HEAD || true)"
+  name="${repo#./}"
+
+  if [[ -z "$branch" ]]; then
+    echo "skip $name: detached HEAD"
+    continue
+  fi
+
+  if [[ "$branch" == "main" || "$branch" == "master" ]]; then
+    echo "skip $name: already on $branch"
+    continue
+  fi
+
+  if [[ -n "$(git -C "$repo" status --porcelain)" ]]; then
+    echo "skip $name: working tree is not clean"
+    continue
+  fi
+
+  target=""
+  if git -C "$repo" show-ref --verify --quiet refs/heads/main; then
+    target="main"
+  elif git -C "$repo" show-ref --verify --quiet refs/heads/master; then
+    target="master"
+  elif git -C "$repo" show-ref --verify --quiet refs/remotes/origin/main; then
+    target="main"
+  elif git -C "$repo" show-ref --verify --quiet refs/remotes/origin/master; then
+    target="master"
+  else
+    echo "skip $name: no main/master branch found"
+    continue
+  fi
+
+  echo "update $name: $branch -> $target"
+  git -C "$repo" checkout "$target"
+  git -C "$repo" pull --ff-only
+ done
