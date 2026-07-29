@@ -1,5 +1,5 @@
 ---
-name: render-mermaid
+name: mermaid-render
 description: Renders Mermaid diagram definitions with a locally installed Mermaid CLI and displays the resulting image in the response. Use when users ask to create, render, preview, or show Mermaid diagrams, including flowcharts, sequence diagrams, class diagrams, state diagrams, and ER diagrams.
 ---
 
@@ -28,12 +28,12 @@ flowchart LR
 3. Render a PNG through the helper:
 
    ```sh
-   /path/to/render-mermaid/scripts/render-mermaid.sh diagram.mmd diagram.png
+   /path/to/mermaid-render/scripts/render-mermaid.sh diagram.mmd diagram.png
    ```
 
    Pass Mermaid CLI flags after the output path when useful, for example `--backgroundColor transparent`.
 4. Open the PNG with the environment's image-viewing tool. If it renders incorrectly, revise the `.mmd` source and repeat.
-5. Display the inspected image directly in the answer. Also provide the output file link when it was saved in the workspace.
+5. Display the inspected image directly in the answer. Always also provide a clickable link to the output image file, so the user can open it if inline rendering does not work.
 
 ## CLI requirement
 
