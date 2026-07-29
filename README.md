@@ -22,6 +22,7 @@ npx skills@latest add berend/my-skills/grill-me-context
 npx skills@latest add berend/my-skills/aicommit
 npx skills@latest add berend/my-skills/multi-service-mr-review
 npx skills@latest add berend/my-skills/projekt-arbeit-übersicht
+npx skills@latest add berend/my-skills/render-mermaid
 ```
 
 and copy the `ralph` script into your `~/bin` (or something that is in your path)
