@@ -25,6 +25,12 @@ npx skills@latest add berend/my-skills/projekt-arbeit-übersicht
 npx skills@latest add berend/my-skills/mermaid-render
 ```
 
+The Mermaid rendering skill also requires `mmdr` on `PATH`:
+
+```sh
+cargo install mermaid-rs-renderer
+```
+
 and copy the `ralph` script into your `~/bin` (or something that is in your path)
 Here is a normal workflow:
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $(basename "$0") INPUT.mmd OUTPUT.png [mmdc options...]" >&2
+  echo "Usage: $(basename "$0") INPUT.mmd OUTPUT.{png,svg} [mmdr options...]" >&2
   exit 64
 }
 
@@ -20,22 +20,26 @@ shift 2
 output_dir=$(dirname "$output")
 mkdir -p "$output_dir"
 
-if command -v mmdc >/dev/null 2>&1; then
-  renderer=(mmdc)
-elif [[ -x "node_modules/.bin/mmdc" ]]; then
-  renderer=("$PWD/node_modules/.bin/mmdc")
-else
+case "${output##*.}" in
+  png | svg) output_format=${output##*.} ;;
+  *)
+    echo "Unsupported output format: $output (expected .png or .svg)" >&2
+    exit 65
+    ;;
+esac
+
+if ! command -v mmdr >/dev/null 2>&1; then
   cat >&2 <<'EOF'
-Mermaid CLI was not found. Install it locally in this project with:
-  npm install --save-dev @mermaid-js/mermaid-cli
-or make mmdc available on PATH.
+The mmdr Mermaid renderer was not found. Install it with:
+  cargo install mermaid-rs-renderer
+or make mmdr available on PATH.
 EOF
   exit 69
 fi
 
-"${renderer[@]}" --input "$input" --output "$output" "$@"
+mmdr --input "$input" --output "$output" --outputFormat "$output_format" "$@"
 
 [[ -f "$output" ]] || {
-  echo "Mermaid CLI finished without creating: $output" >&2
+  echo "mmdr finished without creating: $output" >&2
   exit 70
 }
