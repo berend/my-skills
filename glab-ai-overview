@@ -3,9 +3,10 @@ set -euo pipefail
 
 since_days=7
 all_projects=false
+only_me=false
 
 usage() {
-    echo "Usage: $0 [--since-days DAYS] [--all-projects]"
+    echo "Usage: $0 [--since-days DAYS] [--all-projects] [--only-me]"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -20,6 +21,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --all-projects)
             all_projects=true
+            shift
+            ;;
+        --only-me)
+            only_me=true
             shift
             ;;
         -h|--help)
@@ -44,11 +49,30 @@ projects_with_commits=0
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 
+username=""
+my_emails='[]'
+if [[ "$only_me" == true ]]; then
+    current_user="$(glab api user)"
+    username="$(printf '%s' "$current_user" | jq -er '.username | select(type == "string" and length > 0)')"
+    my_emails="$(
+        glab api --paginate "user/emails?per_page=100" \
+            | jq -s --argjson user "$current_user" '
+                [$user.email, $user.commit_email, (.[][] | select(.confirmed_at != null) | .email)]
+                | map(select(type == "string" and length > 0 and . != "_private") | ascii_downcase)
+                | unique
+            '
+    )"
+    if [[ "$(printf '%s' "$my_emails" | jq 'length')" -eq 0 ]]; then
+        echo "Error: no email addresses available for GitLab user $username" >&2
+        exit 1
+    fi
+fi
+
 process_project() {
     local project_ref="$1"
     local page=1
     local project_total=0
-    local commits count sha message model agent
+    local commits count sha parent_count is_mr_merge message model agent
 
     while true; do
         commits="$(
@@ -61,10 +85,27 @@ process_project() {
             break
         fi
 
-        project_total=$((project_total + count))
+        if [[ "$only_me" == true ]]; then
+            commits="$(
+                printf '%s' "$commits" | jq --argjson emails "$my_emails" '
+                    map(select(((.author_email // "") | ascii_downcase) as $email | ($emails | index($email)) != null))
+                '
+            )"
+        fi
 
-        while read -r sha; do
+        while read -r sha parent_count; do
             [[ -z "$sha" ]] && continue
+
+            if [[ "$parent_count" -gt 1 ]]; then
+                # Associated MRs also contain manual merges; match the exact MR merge SHA.
+                is_mr_merge="$(
+                    glab api --paginate "projects/$project_ref/repository/commits/$sha/merge_requests?per_page=100" \
+                        | jq -s --arg sha "$sha" 'any(.[][]; .state == "merged" and .merge_commit_sha == $sha)'
+                )"
+                [[ "$is_mr_merge" == true ]] && continue
+            fi
+
+            project_total=$((project_total + 1))
             total=$((total + 1))
 
             message="$(
@@ -88,7 +129,7 @@ process_project() {
                 printf 'model\t%s\nagent\t%s\n' "$model" "$agent" >> "$tmp"
             fi
         done <<EOF
-$(printf '%s' "$commits" | jq -r '.[].id')
+$(printf '%s' "$commits" | jq -r '.[] | [.id, (.parent_ids | length)] | @tsv')
 EOF
 
         page=$((page + 1))
@@ -126,9 +167,12 @@ else
     process_project ":fullpath"
 fi
 
-awk -v ai="$ai" -v total="$total" -v projects_with_commits="$projects_with_commits" -v since_date="$since_date" -v until_date="$until_date" '
+awk -v ai="$ai" -v total="$total" -v projects_with_commits="$projects_with_commits" -v since_date="$since_date" -v until_date="$until_date" -v username="$username" '
 BEGIN {
   print "Date range: " since_date " to " until_date
+  if (username != "") {
+    print "GitLab user: " username
+  }
   print "Projects with commits: " projects_with_commits
   print "Total commits: " total
   print "AI-assisted commits: " ai

@@ -59,6 +59,8 @@ claude is somehow deprecated since Anthropic remove `-p` from subscription plans
 
 Use `glab-ai-overview` inside a GitLab project to summarize how many recent commits are marked with `AI-Assisted: true`.
 
+The script scans the default branch's history. It excludes merge commits whose SHA matches a merged GitLab MR's `merge_commit_sha`, while keeping other merge commits, including manual conflict resolutions with AI trailers. Only projects with counted commits contribute to `Projects with commits`.
+
 ```sh
 ./glab-ai-overview --since-days 14
 ```
@@ -68,6 +70,14 @@ To scan all non-archived GitLab projects where your `glab` user is a member:
 ```sh
 ./glab-ai-overview --all-projects --since-days 14
 ```
+
+To show only commits authored by your authenticated GitLab account:
+
+```sh
+./glab-ai-overview --only-me --since-days 14
+```
+
+`--only-me` also works with `--all-projects`. It matches commit author emails against your account's primary email, commit email, and verified registered emails, and prints the detected GitLab username. Your existing `glab` login is sufficient; commits using unregistered emails are excluded.
 
 Note: For --all-projects to work, you also need to be in a git repo, because the server is determined by the origin from the current repo.
 
